@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <link rel="stylesheet" href="./map/OpenLayers.css" type="text/css">
+        <style type="text/css">
+            html, body, #map {
+                margin: 0;
+                padding: 0;
+                overflow: hidden;
+            }
+            body {
+                border: 1px solid black;
+                margin: 10px 10px 10px 8px;
+            }
+            #map {
+                height: 485px;
+                width: 758px;
+            }
+        </style>
+        <script src="./map/OpenLayers.js"></script>
+        <script src="http://maps.google.com/maps/api/js?v=3.5&sensor=false"></script>
+        <script>
+            var map;
+
+            var layers = new Object;
+            var icons = new Object;
+            var markers = new Array;
+            var trackPoints = new Array;
+            
+            function init(){
+            
+                // Load the theme
+                OpenLayers.ImgPath = "http://js.mapbox.com/theme/dark/";
+                
+                // Initialize map and controls
+                map = new OpenLayers.Map('map', { controls: [] });
+                map.addControl(new OpenLayers.Control.Attribution());
+                map.addControl(new OpenLayers.Control.PanZoomBar({zoomStopHeight: 5}));
+                map.addControl(new OpenLayers.Control.Navigation());
+                map.addControl(new OpenLayers.Control.KeyboardDefaults());
+    
+                // Initialize layers
+                layers.gmap_street = new OpenLayers.Layer.Google(
+                    "Google Streets",
+                    {numZoomLevels: 19,  animationEnabled: true}
+                );
+                layers.gmap_terrain = new OpenLayers.Layer.Google(
+                    "Google Terrain",
+                    {type: google.maps.MapTypeId.TERRAIN, animationEnabled: true}
+                );
+                layers.gmap_satellite = new OpenLayers.Layer.Google(
+                    "Google Satellite",
+                    {type: google.maps.MapTypeId.SATELLITE, numZoomLevels: 22}
+                );
+                layers.gmap_hybrid = new OpenLayers.Layer.Google(
+                    "Google Hybrid",
+                    {type: google.maps.MapTypeId.HYBRID, numZoomLevels: 20}
+                );
+                
+                layers.markers = new OpenLayers.Layer.Markers();
+                layers.track = new OpenLayers.Layer.Vector();
+                
+                map.addLayer(layers.gmap_street);
+                map.addLayer(layers.gmap_terrain);
+                map.addLayer(layers.gmap_satellite);
+                map.addLayer(layers.gmap_hybrid);
+                map.addLayer(layers.track);
+                map.addLayer(layers.markers);
+                
+                // Initialize icons
+                var size = new OpenLayers.Size(32,37);
+                var offset = new OpenLayers.Pixel(-(size.w/2), -size.h);
+                
+                icons.start = new OpenLayers.Icon('./map/icons/start.png', size, offset);
+                icons.finish = new OpenLayers.Icon('./map/icons/finish.png', size, offset);
+                
+                // Boot map to right location and zoom level
+                resetMap();
+            };
+            
+            function setMapCenter(lat, lon, zoom) {
+                map.setCenter(getTranslatedLatLon(lat,lon), zoom);
+            };
+            
+            // Google.v3 uses EPSG:900913 as projection, so we have to
+            // transform our coordinates
+            function getTranslatedLatLon(lat,lon) {
+                return new OpenLayers.LonLat(lon,lat).transform(
+                        new OpenLayers.Projection("EPSG:4326"), map.getProjectionObject()
+                );
+            };
+            
+            function getTranslatedPoint(lat,lon) {
+                return new OpenLayers.Geometry.Point(lon,lat).transform(
+                        new OpenLayers.Projection("EPSG:4326"), map.getProjectionObject()
+                );
+            }
+            
+            function resetMap() {
+                
+                for(i = 0; i < markers.length; i++) {
+                    layers.markers.removeMarker(markers[i]);
+                    markers[i].destroy;
+                }
+                markers.length = 0;
+
+                layers.track.destroyFeatures();
+                trackPoints.length = 0;
+                
+                setBaseLayer(layers.gmap_street);
+                setMapCenter(30,-25,2);
+            };
+            
+            function setBaseLayer(baselayer) {
+                map.setBaseLayer(baselayer);
+            };
+            
+            function addStartMarker(lat,lon) {
+                addMarker(lat,lon,icons.start);
+            }
+            
+            function addFinishMarker(lat,lon) {
+                addMarker(lat,lon,icons.finish);
+            }
+            
+            function addMarker(lat,lon,icon) {
+                var markersLength = markers.length;
+                markers[markersLength] = new OpenLayers.Marker(getTranslatedLatLon(lat,lon), icon.clone());
+                layers.markers.addMarker(markers[markersLength]);
+            };
+            
+            function addTrackPoint(lat,lon) {
+                trackPoints.push(getTranslatedPoint(lat,lon));
+            };
+            
+            function drawTrack() {
+            
+                var style = { strokeColor: '#ff0000',
+                    strokeOpacity: 0.5,
+                    strokeWidth: 3,
+                };
+                
+                layers.track.destroyFeatures();
+                
+                layers.track.addFeatures([new OpenLayers.Feature.Vector(new OpenLayers.Geometry.LineString(trackPoints), null, style)]);
+                map.zoomToExtent(layers.track.getDataExtent());
+                
+            };
+            
+        </script>
+    </head>
+    <body onload="init()">
+        <div id="map"></div>
+    </body>
+</html>
